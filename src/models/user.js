@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
     firstName:{
         type: String,
         required: true,
+        minLength: 4,
     },
     lastName:{
         type: String,
@@ -11,15 +12,28 @@ const mongoose = require('mongoose');
     emailId:{
         type: String,
         required: true,
+        unique: true,
+        lowercase: true,
+        trim: true,
     },
     password:{
         type: String,
     },
     age:{
         type: Number,
+        min: 18,
     },
     gender:{
         type: String,
+        validate(value) {
+            if(!["male","female","others"].includes(value)){
+                throw new Error("Gender data is not valid");
+            }
+        },
+    },
+    about:{
+        type: String,
+        default: "This is default about of user",
     }
  },{
     timestamps: true,

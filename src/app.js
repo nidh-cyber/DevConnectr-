@@ -2,6 +2,8 @@ const express = require('express');
 const app = express();
 const {connectDB} =  require('./config/database');
 const User = require('./models/user');
+const { validateSingnupData } = require('./utils/validation');
+const bcrypt = require('bcrypt');
 
 
 app.use(express.json()); 
@@ -9,22 +11,43 @@ app.use(express.json());
 
 
 app.post('/signup', async(req,res)=>{
-    //creating new instance of user object 
-    // const user = new User({
-    //     firstName:'MS',
-    //     lastName:'Dhoni',
-    //     emailId:'dhoni2@gmail.com',
-    //     password:'dhoni@123'
-    // })
-    const user = new User(req.body);
-    console.log(req.body);
 
     try{
+        validateSingnupData(req);
+        //creating new instance of User model
+        // const user = new User(req.body);// never trust req.body
+        const {firstName,lastName,emailId,password}=req.body
+        //Encrypt the password
+        const hashPassword = await bcrypt.hash(password,10);
+        const user = new User({
+            firstName,
+            lastName,
+            emailId,
+            password: hashPassword
+        });
         await user.save();
         res.status(200).send("user created successfully");
     }
     catch(err){
-        console.error("Error creating user," + err.message);
+        res.status(400).send(err.message);
+    }
+})
+
+app.post("/login", async(req,res) =>{
+
+    try{
+            const {email, password } = req.body;
+            const user = await User.findOne({emailId:email});
+            if(!user)
+                throw new Error("invalid credentials");
+            const ispassvalid = await bcrypt.compare(password,user.password);
+            if(!ispassvalid)
+                throw new Error("invalid credentials");
+            else{
+                res.send("Login successfull");
+            }
+    } catch (err){
+        res.status(400).send("Error: " + err.message);
     }
 })
 
@@ -44,20 +67,24 @@ app.get('/GetAllData',async(req,res)=>{
 })
 
 app.patch('/users', async(req,res)=>{
-    // const {id, firstName} = req.body;
-    const {first,last} = req.body;
+    const {id, data } = req.body;
+    // const {first,last} = req.body;
     try{
-        // const user = await User.findByIdAndUpdate(id, {firstName:firstName}) ;
-        const user = await User.findOneAndUpdate({firstName:first},{lastName:last});
-        await user.save();
-        console.log(user);
+        const user = await User.findByIdAndUpdate(id, data,{
+            runValidators: true,
+            new: true,
+            context: "query",
+        } ) ;
+        // const user = await User.findOneAndUpdate({firstName:first},{lastName:last});
+        // await user.save();
+        // console.log(user);
         res.send("User updated suuceessfully");
     }
     catch(err){
         console.log("somethig went wrong "+ err.message);
     }
 
-})
+});
 
 app.delete('/delete',async(req,res)=>{
     const {id} = req.body;
@@ -81,7 +108,4 @@ app.delete('/delete',async(req,res)=>{
         console.log("Database can not be connected");
     })   
     
-
-//PUT replaces entire object, if you dont update some value it removes them and create object with updated data only
-//PATCH updated partial resource, it keeps other data as it is and updated only given data.
 
